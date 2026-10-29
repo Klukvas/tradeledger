@@ -1,0 +1,88 @@
+name: tradeledger-prod
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: tradeledger
+      POSTGRES_USER: tradeledger_admin
+      POSTGRES_PASSWORD: ${TRADELEDGER_DB_ADMIN_PASSWORD:?Production configuration required}
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U tradeledger_admin -d tradeledger"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+    stop_grace_period: 60s
+    logging: *logging
+  migrate:
+    image: tradeledger-api:${TRADELEDGER_RELEASE:?Use prod-stack deploy}
+    environment:
+      DATABASE_URL: ${TRADELEDGER_ADMIN_DATABASE_URL:?Production configuration required}
+    command: [sh, -c, "npm run db:migrate && node scripts/post-migrate-grants.mjs"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    logging: *logging
+  api:
+    image: tradeledger-api:${TRADELEDGER_RELEASE:?Use prod-stack deploy}
+    environment:
+      DATABASE_URL: ${TRADELEDGER_APP_DATABASE_URL:?Production configuration required}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Production HTTPS origin required}
+      TRUST_PROXY_HOPS: "1"
+      HOST: 0.0.0.0
+      PORT: "5180"
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:5180/api/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    logging: *logging
+  web:
+    image: tradeledger-web:${TRADELEDGER_RELEASE:?Use prod-stack deploy}
+    healthcheck:
+      test: [CMD-SHELL, "curl --fail --silent --output /dev/null http://127.0.0.1:8080/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    stop_grace_period: 15s
+    logging: *logging
+  caddy:
+    image: caddy:2.11.7-alpine
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?Production HTTPS origin required}
+      PUBLIC_HOST: ${PUBLIC_HOST:?Production host required}
+    ports:
+      - "${TRADELEDGER_BIND:-0.0.0.0}:${TRADELEDGER_HTTP_PORT:-80}:80"
+      - "${TRADELEDGER_BIND:-0.0.0.0}:${TRADELEDGER_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${TRADELEDGER_CADDYFILE:-./deploy/Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging: *logging
+volumes:
+  database:
+  caddy_data:
+  caddy_config:

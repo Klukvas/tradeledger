@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.cache/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+.DS_Store
+server/src/generated/prisma/
+
+!.env.production.example
+.production-state/

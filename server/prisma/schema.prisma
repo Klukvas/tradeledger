@@ -1,0 +1,231 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "cjs"
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  sessions Session[]
+  workspace Workspace?
+  id String @id @default(uuid()) @db.Uuid
+  email String @unique @db.VarChar(254)
+  passwordHash String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Session {
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tokenHash String @id @db.VarChar(64)
+  userId String @db.Uuid
+  expiresAt DateTime @db.Timestamptz(3)
+  revokedAt DateTime? @db.Timestamptz(3)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Workspace {
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  datasets Dataset[] @relation("WorkspaceDatasets")
+  activeDataset Dataset? @relation("ActiveDataset", fields: [id,activeDatasetId], references: [workspaceId,id], onDelete: NoAction, onUpdate: NoAction)
+  receipts CommandReceipt[]
+  id String @id @default(uuid()) @db.Uuid
+  userId String @unique @db.Uuid
+  activeDatasetId String? @db.Uuid
+  revision BigInt @default(0)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Dataset {
+  workspace Workspace @relation("WorkspaceDatasets", fields: [workspaceId], references: [id], onDelete: Restrict)
+  activeIn Workspace[] @relation("ActiveDataset")
+  inventory InventoryItem[]
+  accounts Account[]
+  debts Debt[]
+  snapshots Snapshot[]
+  audit AuditEvent[]
+  receipts CommandReceipt[]
+  id String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+  source String @db.VarChar(16)
+  sourceHash String? @db.VarChar(64)
+  sourceRevision BigInt
+  sourceUpdatedAt DateTime @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  accountHistoryStartedAt DateTime? @db.Timestamptz(3)
+  archivedAt DateTime? @db.Timestamptz(3)
+  archivedRevision BigInt?
+  archivedDocumentUpdatedAt DateTime? @db.Timestamptz(3)
+  @@unique([workspaceId,id])
+  @@index([workspaceId,archivedAt])
+}
+
+model InventoryItem {
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  movements InventoryMovement[]
+  datasetId String @db.Uuid
+  id String @db.VarChar(128)
+  sku String @db.VarChar(80)
+  skuKey String
+  name String @db.VarChar(120)
+  quantity BigInt
+  stockValueMinor BigInt
+  position Int
+  @@id([datasetId,id])
+  @@unique([datasetId,skuKey])
+  @@unique([datasetId,position])
+}
+
+model InventoryMovement {
+  item InventoryItem @relation(fields: [datasetId,itemId], references: [datasetId,id], onDelete: Restrict)
+  id String @id @default(uuid()) @db.Uuid
+  datasetId String @db.Uuid
+  itemId String @db.VarChar(128)
+  commandId String? @db.VarChar(128)
+  kind String @db.VarChar(32)
+  quantityDelta BigInt
+  valueDeltaMinor BigInt
+  resultingQuantity BigInt
+  resultingValueMinor BigInt
+  reason String? @db.VarChar(1000)
+  occurredAt DateTime? @db.Timestamptz(3)
+  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([datasetId,itemId,recordedAt])
+}
+
+model Account {
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  balanceChanges BalanceChange[]
+  history AccountHistory[]
+  snapshotAccounts SnapshotAccount[]
+  datasetId String @db.Uuid
+  id String @db.VarChar(128)
+  name String @db.VarChar(120)
+  owner String @db.VarChar(120)
+  provider String @db.VarChar(16)
+  balanceMinor BigInt
+  position Int
+  @@id([datasetId,id])
+  @@unique([datasetId,position])
+}
+
+model AccountHistory {
+  account Account @relation(fields: [datasetId,accountId], references: [datasetId,id], onDelete: Restrict)
+  datasetId String @db.Uuid
+  accountId String @db.VarChar(128)
+  revision BigInt
+  effectiveAt DateTime @db.Timestamptz(3)
+  name String @db.VarChar(120)
+  owner String @db.VarChar(120)
+  provider String @db.VarChar(16)
+  balanceMinor BigInt
+  position Int
+  @@id([datasetId,accountId,revision])
+  @@index([datasetId,accountId,effectiveAt,revision])
+}
+
+model BalanceChange {
+  account Account @relation(fields: [datasetId,accountId], references: [datasetId,id], onDelete: Restrict)
+  id String @id @default(uuid()) @db.Uuid
+  datasetId String @db.Uuid
+  accountId String @db.VarChar(128)
+  commandId String? @db.VarChar(128)
+  kind String @db.VarChar(32)
+  beforeMinor BigInt?
+  afterMinor BigInt
+  occurredAt DateTime? @db.Timestamptz(3)
+  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([datasetId,accountId,recordedAt])
+}
+
+model Debt {
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  repayments Repayment[]
+  datasetId String @db.Uuid
+  id String @db.VarChar(128)
+  direction String @db.VarChar(16)
+  counterparty String @db.VarChar(120)
+  principalMinor BigInt
+  repaidMinor BigInt
+  note String @db.VarChar(1000)
+  position Int
+  @@id([datasetId,id])
+  @@unique([datasetId,position])
+}
+
+model Repayment {
+  debt Debt @relation(fields: [datasetId,debtId], references: [datasetId,id], onDelete: Restrict)
+  id String @id @default(uuid()) @db.Uuid
+  datasetId String @db.Uuid
+  debtId String @db.VarChar(128)
+  amountMinor BigInt
+  kind String @db.VarChar(32)
+  commandId String? @db.VarChar(128)
+  occurredAt DateTime? @db.Timestamptz(3)
+  recordedAt DateTime @default(now()) @db.Timestamptz(3)
+  @@index([datasetId,debtId,recordedAt])
+}
+
+model Snapshot {
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  accounts SnapshotAccount[]
+  datasetId String @db.Uuid
+  id String @db.VarChar(128)
+  createdAt String @db.VarChar(40)
+  label String @db.VarChar(120)
+  totalMinor BigInt
+  closedMonth String? @db.VarChar(7)
+  position Int
+  @@id([datasetId,id])
+  @@unique([datasetId,closedMonth])
+  @@unique([datasetId,position])
+}
+
+model SnapshotAccount {
+  snapshot Snapshot @relation(fields: [datasetId,snapshotId], references: [datasetId,id], onDelete: Restrict)
+  account Account @relation(fields: [datasetId,accountId], references: [datasetId,id], onDelete: Restrict)
+  datasetId String @db.Uuid
+  snapshotId String @db.VarChar(128)
+  accountId String @db.VarChar(128)
+  name String @db.VarChar(120)
+  owner String @db.VarChar(120)
+  provider String @db.VarChar(16)
+  balanceMinor BigInt
+  position Int
+  @@id([datasetId,snapshotId,accountId])
+  @@unique([datasetId,snapshotId,position])
+  @@index([datasetId,accountId])
+}
+
+model AuditEvent {
+  dataset Dataset @relation(fields: [datasetId], references: [id], onDelete: Restrict)
+  datasetId String @db.Uuid
+  id String @db.VarChar(128)
+  at String @db.VarChar(40)
+  type String @db.VarChar(32)
+  entityId String? @db.VarChar(128)
+  summary String @db.VarChar(1000)
+  position Int
+  @@id([datasetId,id])
+  @@unique([datasetId,position])
+}
+
+model CommandReceipt {
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  dataset Dataset @relation(fields: [workspaceId,datasetId], references: [workspaceId,id], onDelete: Restrict)
+  workspaceId String @db.Uuid
+  requestId String @db.VarChar(128)
+  requestKind String @db.VarChar(16)
+  requestHash String @db.VarChar(64)
+  datasetId String @db.Uuid
+  committedRevision BigInt
+  committedAt DateTime @db.Timestamptz(3)
+  sourceHash String? @db.VarChar(64)
+  counts Json?
+  @@id([workspaceId,requestId])
+  @@index([workspaceId,datasetId])
+}

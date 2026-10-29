@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.cache
+.git
+.env
+.env.*
+!.env.example
+server/dist
+server/src/generated
+dist
+test-results
+playwright-report
+
+!.env.production.example
+.production-state/

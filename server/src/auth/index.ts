@@ -1,0 +1,6 @@
+export { AuthModule } from './auth.module'
+export { SessionGuard } from './session.guard'
+export { CurrentUser } from './current-user.decorator'
+export type { AuthenticatedUser } from './auth.types'
+export { AUTH_LIMITS } from './auth-limiter'
+export type { AuthLimits } from './auth-limiter'

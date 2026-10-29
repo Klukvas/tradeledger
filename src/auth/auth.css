@@ -1,0 +1,46 @@
+.auth-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: max(24px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+}
+.auth-card {
+  width: min(100%, 460px);
+  min-width: 0;
+}
+.auth-card .page-header {
+  margin-bottom: 0;
+}
+.auth-card .button {
+  min-height: 44px;
+}
+.auth-skeleton {
+  display: grid;
+  gap: 16px;
+  visibility: hidden;
+  animation: auth-reveal 0s 180ms forwards;
+}
+.auth-skeleton span {
+  height: 44px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+}
+@keyframes auth-reveal {
+  to {
+    visibility: visible;
+  }
+}
+.legacy-notice {
+  margin-bottom: 24px;
+}
+.legacy-notice p:last-child {
+  margin-bottom: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-skeleton {
+    animation: none;
+    visibility: visible;
+  }
+}

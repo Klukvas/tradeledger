@@ -1,0 +1,14 @@
+{
+  skip_install_trust
+  auto_https disable_redirects
+}
+https://localhost {
+  tls internal
+  @api path /api /api/*
+  handle @api {
+    reverse_proxy api:5180
+  }
+  handle {
+    reverse_proxy web:8080
+  }
+}

@@ -1,0 +1,15 @@
+{$PUBLIC_ORIGIN} {
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options nosniff
+    Referrer-Policy same-origin
+  }
+  @api path /api /api/*
+  handle @api {
+    reverse_proxy api:5180
+  }
+  handle {
+    reverse_proxy web:8080
+  }
+}
